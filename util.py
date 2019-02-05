@@ -100,3 +100,4 @@ def printv(message, level, verbose, data=[]):
     """
     if verbose > level:
         print(message.format(*data) if data else message)
+

@@ -116,19 +116,59 @@ class KnowledgeBase(object):
             print("Invalid ask:", fact.statement)
             return []
 
-    def kb_retract(self, fact):
-        """Retract a fact from the KB
 
-        Args:
-            fact (Fact) - Fact to be retracted
-
-        Returns:
-            None
+    def kb_retract(self, fact_rule):
+        """Args: fact (Fact) - Fact to be retracted
+            Returns: None
+            never remove anything supported
+            if it's asserted --> get_fact and remove only asserted fact, remove should remove anything as long as it's unasserted & unsupported
         """
-        printv("Retracting {!r}", 0, verbose, [fact])
+        printv("Retracting {!r}", 0, verbose, [fact_rule])
         ####################################################
-        # Student code goes here
-        
+        # check if fact_rule is an asserted fact
+
+        def remove_as_fact_support(kb, f_r):
+            fa = self._get_fact(f_r)
+            for f in fa.supports_facts:
+                for pair in f.supported_by:
+                    if fa in pair:
+                        f_fact = self._get_fact(f)
+                        f.supported_by.remove(pair)
+                        if not f.supported_by and f_fact.asserted is False:
+                            kb.facts.remove(f)
+            '''if f previously supported by fact_rule 
+            is now un-asserted and unsupported (aka supported_by is empty), remove f'''
+
+        def remove_as_rule_support(kb, f_r):
+            fa = self._get_fact(f_r)
+            for r in fa.supports_rules:
+                for pair in r.supported_by:
+                    if fa in pair:
+                        r_rule = self._get_rule(r)
+                        r.supported_by.remove(pair)
+                        if not r.supported_by and r_rule.asserted is False:
+                            kb.rules.remove(r)
+                            " if rule becomes unsupported, remove r"
+
+        if isinstance(fact_rule, Rule):
+            # if is Rule and asserted, do nothing
+                return None
+
+        if isinstance(fact_rule, Fact):
+            # if fact is in kb
+            if fact_rule in self.facts:
+                fact = self._get_fact(fact_rule)
+                if fact.supported_by:
+                    # print("Fact/Rule is supported, can't be retracted:", fact_rule)
+                    return None
+                if fact.asserted:
+                    remove_as_fact_support(self, fact_rule)
+                    remove_as_rule_support(self, fact_rule)
+                    self.facts.remove(fact_rule)
+
+        else:
+            return None
+
 
 class InferenceEngine(object):
     def fc_infer(self, fact, rule, kb):
@@ -146,3 +186,26 @@ class InferenceEngine(object):
             [fact.statement, rule.lhs, rule.rhs])
         ####################################################
         # Student code goes here
+        matching = match(rule.lhs[0], fact.statement)
+        if matching:
+            matchpair = [(fact, rule)]
+            if len(rule.lhs) == 1:
+                infer_f = Fact(instantiate(rule.rhs, matching), matchpair)
+                # if matchpair not in infer_f.supported_by:
+                #     infer_f.supported_by.append(matchpair)
+                # add new fact
+                rule.supports_facts.append(infer_f)
+                fact.supports_facts.append(infer_f)
+                kb.kb_assert(infer_f)
+            else:
+                infer_lhs = []
+                for element in rule.lhs[1:len(rule.lhs)]:
+                    infer_lhs = [instantiate(element, matching)]
+                    # infer_left_component = [instantiate(element, matching)]
+                    # infer_lhs.append(infer_left_component)
+                infer_rhs = instantiate(rule.rhs, matching)
+                infer_r = Rule([infer_lhs, infer_rhs], matchpair)
+                # add new rule
+                fact.supports_rules.append(infer_r)
+                rule.supports_rules.append(infer_r)
+                kb.kb_assert(infer_r)
